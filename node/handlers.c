@@ -125,6 +125,8 @@
 #include "xml.h"
 #include "hooks.h"
 #include <ebs_utils.h>
+#include "http.h"
+#include "walrus.h"
 
 /*----------------------------------------------------------------------------*\
  |                                                                            |
@@ -1989,6 +1991,10 @@ static int init(void)
     else if (initialized < 0)
         return EUCA_ERROR;
 
+    // initialize our libraries and their dependencies
+    http_init();
+    walrus_init();
+
     // ensure that MAXes are zeroed out
     bzero(&nc_state, sizeof(struct nc_state_t));
     strncpy(nc_state.version, EUCA_VERSION, sizeof(nc_state.version));  // set the version
@@ -2287,7 +2293,7 @@ static int init(void)
             LOGWARN("ignoring excessive MAX_CORES value (leaving at %lld)\n", nc_state.cores_max);
         }
         if (nc_state.cores_max > cores)
-            LOGWARN("MAX_CORES value is set to %d that is greater than the amount of physical cores: %d\n", nc_state.cores_max, cores);
+            LOGWARN("MAX_CORES value is set to %lld that is greater than the amount of physical cores: %d\n", nc_state.cores_max, cores);
     }
 
     LOGINFO("physical memory available for instances: %lldMB\n", nc_state.mem_max);

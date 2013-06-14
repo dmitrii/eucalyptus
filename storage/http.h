@@ -113,6 +113,7 @@
  |                                                                            |
 \*----------------------------------------------------------------------------*/
 
+void http_init(void);
 int http_put(const char *file_path, const char *url, const char *login, const char *password);
 char *url_encode(const char *unencoded);
 char *url_decode(const char *encoded);

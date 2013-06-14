@@ -84,6 +84,7 @@
 #include <ctype.h>                     // tolower, isdigit
 #include <sys/types.h>                 // stat
 #include <sys/stat.h>                  // stat
+#include <pthread.h>                   // posix lock
 #include <curl/curl.h>
 #include <curl/easy.h>
 
@@ -167,8 +168,11 @@ struct write_request {
 \*----------------------------------------------------------------------------*/
 
 #ifndef _UNIT_TEST
-static boolean curl_initialized = FALSE;    //!< boolean to indicate if we have already initialize libcurl
+static boolean curl_initialized = FALSE;    //!< boolean to indicate if we have already initialized libcurl
 #endif /* ! _UNIT_TEST */
+
+//! internal lock to prevent apparent race in curl ssl dependency
+static pthread_mutex_t wreq_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*----------------------------------------------------------------------------*\
  |                                                                            |
@@ -192,6 +196,19 @@ static char int_to_hch(char i);
  |                               IMPLEMENTATION                               |
  |                                                                            |
 \*----------------------------------------------------------------------------*/
+
+//!
+//! Initializer for http_* functions. It should be called first, from the
+//! first thread of the process (libcurl dictates that curl_global_init is
+//! called before any threads are spanwed off)
+//!
+void http_init(void)
+{
+    if (!curl_initialized) {
+        curl_global_init(CURL_GLOBAL_SSL);
+        curl_initialized = TRUE;
+    }
+}
 
 //!
 //! Process an HTTP put request to the given URL.
@@ -228,10 +245,7 @@ int http_put(const char *file_path, const char *url, const char *login, const ch
     CURL *curl = NULL;
     CURLcode result = CURLE_OK;
 
-    if (!curl_initialized) {
-        curl_global_init(CURL_GLOBAL_SSL);
-        curl_initialized = TRUE;
-    }
+    http_init(); // in case this is used by a single-threaded code without calling http_init() first
 
     if (!file_path && !url) {
         LOGERROR("invalid params: file_path=%s, url=%s\n", SP(file_path), SP(url));
@@ -576,6 +590,8 @@ int http_get_timeout(const char *url, const char *outfile, int total_retries, in
     CURL *curl = NULL;
     CURLcode result = CURLE_OK;
     struct write_request params = { 0 };
+
+    http_init(); // in case this is used by a single-threaded code without calling http_init() first
 
     if (!url || !outfile) {
         LOGERROR("invalid params: outfile=%s, url=%s\n", SP(outfile), SP(url));

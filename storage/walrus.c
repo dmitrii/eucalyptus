@@ -179,6 +179,8 @@ struct progress_data_t {
  |                                                                            |
 \*----------------------------------------------------------------------------*/
 
+static boolean curl_initialized = FALSE;    //!< boolean to indicate if we have already initialized libcurl
+
 //! walrus_request internal lock to prevent apparent race in curl ssl dependency
 static pthread_mutex_t wreq_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -212,6 +214,19 @@ static int progress_function(void *clientp, double dltotal, double dlnow, double
  |                               IMPLEMENTATION                               |
  |                                                                            |
 \*----------------------------------------------------------------------------*/
+
+//!
+//! Initializer for walrus_* functions. It should be called first, from the
+//! first thread of the process (libcurl dictates that curl_global_init is
+//! called before any threads are spanwed off)
+//!
+void walrus_init(void)
+{
+    if (!curl_initialized) {
+        curl_global_init(CURL_GLOBAL_SSL);
+        curl_initialized = TRUE;
+    }
+}
 
 //!
 //! downloads a decrypted image from Walrus based on the manifest URL,
@@ -253,6 +268,8 @@ static int walrus_request_timeout(const char *walrus_op, const char *verb, const
     struct curl_slist *headers = NULL; // beginning of a DLL with headers
 
     pthread_mutex_lock(&wreq_mutex);   // lock for curl construction
+
+    walrus_init(); // in case this is used by a single-threaded code without calling walrus_init() first
 
     euca_strncpy(url, requested_url, BUFSIZE);
 #if defined(CAN_GZIP)
