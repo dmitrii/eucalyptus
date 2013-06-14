@@ -245,8 +245,6 @@ int http_put(const char *file_path, const char *url, const char *login, const ch
     CURL *curl = NULL;
     CURLcode result = CURLE_OK;
 
-    http_init(); // in case this is used by a single-threaded code without calling http_init() first
-
     if (!file_path && !url) {
         LOGERROR("invalid params: file_path=%s, url=%s\n", SP(file_path), SP(url));
         return (EUCA_INVALID_ERROR);
@@ -267,9 +265,14 @@ int http_put(const char *file_path, const char *url, const char *login, const ch
         return (EUCA_ACCESS_ERROR);
     }
 
+    pthread_mutex_lock(&wreq_mutex);   // lock for curl construction
+
+    http_init(); // in case this is used by a single-threaded code without calling http_init() first
+
     if ((curl = curl_easy_init()) == NULL) {
         LOGERROR("could not initialize libcurl\n");
         fclose(fp);
+        pthread_mutex_unlock(&wreq_mutex);
         return (EUCA_ERROR);
     }
 
@@ -348,6 +351,8 @@ int http_put(const char *file_path, const char *url, const char *login, const ch
     fclose(fp);
 
     curl_easy_cleanup(curl);
+    pthread_mutex_unlock(&wreq_mutex);
+
     return (code);
 }
 
@@ -591,8 +596,6 @@ int http_get_timeout(const char *url, const char *outfile, int total_retries, in
     CURLcode result = CURLE_OK;
     struct write_request params = { 0 };
 
-    http_init(); // in case this is used by a single-threaded code without calling http_init() first
-
     if (!url || !outfile) {
         LOGERROR("invalid params: outfile=%s, url=%s\n", SP(outfile), SP(url));
         return (EUCA_INVALID_ERROR);
@@ -612,9 +615,14 @@ int http_get_timeout(const char *url, const char *outfile, int total_retries, in
         return (EUCA_ACCESS_ERROR);
     }
 
+    pthread_mutex_lock(&wreq_mutex);   // lock for curl construction
+
+    http_init(); // in case this is used by a single-threaded code without calling http_init() first
+
     if ((curl = curl_easy_init()) == NULL) {
         LOGERROR("could not initialize libcurl\n");
         fclose(fp);
+        pthread_mutex_unlock(&wreq_mutex);
         return (EUCA_ERROR);
     }
 
@@ -691,6 +699,8 @@ int http_get_timeout(const char *url, const char *outfile, int total_retries, in
         remove(outfile);
     }
     curl_easy_cleanup(curl);
+    pthread_mutex_unlock(&wreq_mutex);
+
     return (code);
 }
 
